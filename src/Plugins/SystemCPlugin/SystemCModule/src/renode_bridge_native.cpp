@@ -5,6 +5,7 @@
 // Full license text is available in 'licenses/MIT.txt'.
 //
 #include "renode_bridge_native.h"
+#include "renode_imports.h"
 #include <stdexcept>
 
 renode_bridge_factory_t& get_factory() {
@@ -68,7 +69,7 @@ std::uint64_t tlm_read(std::size_t size, std::uint64_t offset) {
   }
 
   prepare_payload(payload, tlm::TLM_READ_COMMAND, offset, data.data(), size);
-  model->tlm()->b_transport(payload, delay);
+  model->tlm_route(offset)->b_transport(payload, delay);
 
   std::uint64_t result = 0;
   std::memcpy(&result, data.data(), size);
@@ -88,5 +89,16 @@ void tlm_write(std::size_t size, std::int64_t value, std::uint64_t offset) {
 
   std::memcpy(data.data(), &value, size);
   prepare_payload(payload, tlm::TLM_WRITE_COMMAND, offset, data.data(), size);
-  model->tlm()->b_transport(payload, delay);
+  model->tlm_route(offset)->b_transport(payload, delay);
 }
+
+void gpio_write(int number, bool value) {
+  auto *model = get_model();
+  if (!model) {
+    throw std::runtime_error("Model must not be null!");
+  }
+
+  model->gpio_port_write(number, value);
+}
+
+EXTERNAL_AS(void, UpdateGPIOConnections, renode_gpio_update, int32_t, int32_t);

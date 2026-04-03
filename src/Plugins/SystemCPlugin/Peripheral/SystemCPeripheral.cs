@@ -271,6 +271,27 @@ namespace Antmicro.Renode.Peripherals.SystemC
                 }
             }
 
+            try
+            {
+                forwardSocket?.Shutdown(SocketShutdown.Both);
+            }
+            catch(SocketException ex)
+            {
+                this.DebugLog("Exception when shutting down forward socket: {0}", ex.Message);
+            }
+            try
+            {
+                backwardSocket?.Shutdown(SocketShutdown.Both);
+            }
+            catch(SocketException ex)
+            {
+                this.DebugLog("Exception when shutting down backward socket: {0}", ex.Message);
+            }
+            if(backwardThreadStarted)
+            {
+                // Give the backward connection thread some time to gracefully shut down the TCP connection.
+                backwardThread.Join(TimeSpan.FromMilliseconds(500));
+            }
             forwardSocket?.Close();
             backwardSocket?.Close();
         }
@@ -291,6 +312,7 @@ namespace Antmicro.Renode.Peripherals.SystemC
             {
                 return;
             }
+            this.NoisyLog("Renode-triggered GPIO {0}, value {1}", number, value);
 
             BitHelper.SetBit(ref outGPIOState, (byte)number, value);
             var request = new RenodeMessage(RenodeAction.GPIOWrite, 0, 0, 0, outGPIOState);
@@ -476,6 +498,7 @@ namespace Antmicro.Renode.Peripherals.SystemC
             SendRequest(new RenodeMessage(RenodeAction.Init, 0, 0, 0, (ulong)timeSyncPeriodUS), out var response);
 
             backwardThread.Start();
+            backwardThreadStarted = true;
         }
 
         private void SetupTimesync()
@@ -564,6 +587,7 @@ namespace Antmicro.Renode.Peripherals.SystemC
                     {
                         bool irqval = (message.Payload & (1UL << pin)) != 0;
                         Connections[pin].Set(irqval);
+                        this.NoisyLog("SystemC-triggered GPIO {0}, value {1}", pin, irqval);
                     }
                     break;
                 case RenodeAction.Write:
@@ -731,6 +755,7 @@ namespace Antmicro.Renode.Peripherals.SystemC
         private ulong outGPIOState;
         private Process systemcProcess;
         private string systemcExecutablePath;
+        private bool backwardThreadStarted = false;
 
         private readonly Dictionary<int, IDirectAccessPeripheral> directAccessPeripherals;
 

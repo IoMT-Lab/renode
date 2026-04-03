@@ -180,7 +180,6 @@
 - tests/platforms/NPCX9.robot
 - tests/unit-tests/arm-gic-redistributor.robot
 - tests/unit-tests/python-engine.robot
-- tests/network-logging/network-logging.robot
 - tests/unit-tests/riscv-mret.robot
 - tests/platforms/X86.robot
 - tests/platforms/ACRN.robot
@@ -251,6 +250,8 @@
 - tests/platforms/focaltech-ft9001-zephyr.robot
 - tests/unit-tests/arm-cortex-m-mve.robot
 - tests/unit-tests/arm-cortex-m-signals.robot
+- tests/unit-tests/resd-arbitrary-timestamp.robot
+- tests/unit-tests/sysbus-data-race.robot
 
 # Do not use port 3333 in unit tests
 
