@@ -10,7 +10,7 @@ concurrency:
 
 jobs:
   build_x86_64:
-    runs-on: [iomt-arc]
+    runs-on: [self-hosted]
     container:
       image: ghcr.io/iomt-lab/renode-build-docker:main
       options: --user root
@@ -28,7 +28,7 @@ jobs:
           archive: false
 
   build_aarch64:
-    runs-on: [iomt-arc]
+    runs-on: [self-hosted]
     container:
       image: ghcr.io/iomt-lab/renode-build-docker:main
       options: --user root
