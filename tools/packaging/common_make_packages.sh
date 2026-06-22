@@ -12,7 +12,7 @@ function help {
     echo "$0 [-d] [-n] [-l]"
     echo
     echo -e "-d\tuse Debug configuration"
-    echo -e "-n\tcreate a nightly build with date and commit SHA"
+    echo -e "-n\tcreate a nightly build with commit SHA"
     echo -e "-l\tdo not remove workdir after building"
 }
 
@@ -47,4 +47,4 @@ do
 done
 
 VERSION=`cat ../version`
-VERSION="$VERSION$DATE$COMMIT"
+VERSION="$VERSION$COMMIT"
