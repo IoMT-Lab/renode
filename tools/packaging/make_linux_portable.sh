@@ -15,9 +15,9 @@ DESTINATION=renode_${VERSION}-portable
 OS_NAME=linux
 SED_COMMAND="sed -i"
 DIR=$DESTINATION
-ARCHIVE_NAME="renode-$VERSION.linux-portable.tar.gz"
+ARCHIVE_NAME="renode-portable.tar.gz"
 if [[ $RID == "linux-arm64" ]]; then
-    ARCHIVE_NAME="renode-$VERSION.$RID-portable.tar.gz"
+    ARCHIVE_NAME="renode-portable.tar.gz"
 fi
 
 . common_copy_files_portable.sh
@@ -45,7 +45,7 @@ chmod +x $DESTINATION/renode
 
 # Create tar
 mkdir -p ../../output/packages
-tar -czf ../../output/packages/$ARCHIVE_NAME $DESTINATION
+tar -czf ../../output/packages/$ARCHIVE_NAME -C $DESTINATION .
 
 echo "Created a dotnet portable package in output/packages/$ARCHIVE_NAME"
 

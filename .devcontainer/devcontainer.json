@@ -1,6 +1,6 @@
 {
 	"name": "Renode Build",
-	"image": "ghcr.io/iomt-lab/renode-build-docker:main",
+	"image": "nexus.medmakers.io/docker/renode-build:latest",
 	"postStartCommand": "git config --global --add safe.directory '*'",
 	"customizations": {
 		"vscode": {
