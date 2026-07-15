@@ -10,6 +10,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Net.Http;
+using System.Security.Cryptography;
 using System.Threading.Tasks;
 
 using Antmicro.Renode.Utilities;
@@ -32,6 +33,27 @@ namespace Antmicro.Renode.WebSockets.Providers
             {
                 await sourceStream.CopyToAsync(destinationStream);
             }
+        }
+    }
+
+    public static class FileHashExtensions
+    {
+        public static string ComputeFileSha256(string filePath)
+        {
+            var openOptions = new FileStreamOptions
+            {
+                Mode = FileMode.Open,
+                Access = FileAccess.Read,
+                Share = FileShare.Read,
+                Options = FileOptions.SequentialScan
+            };
+
+            var fileStream = new FileStream(filePath, openOptions);
+            var hashBytes = SHA256.HashData(fileStream);
+            fileStream.Dispose();
+
+            // 3. Output the final byte array as a lowercase hex string
+            return Convert.ToHexString(hashBytes).ToLowerInvariant();
         }
     }
 
@@ -318,6 +340,46 @@ namespace Antmicro.Renode.WebSockets.Providers
             }
         }
 
+        [WebSocketAPIAction("fs/check", "1.5.0")]
+        private WebSocketAPIResponse CheckFileAction(List<string> args)
+        {
+            try
+            {
+                var fullPath = ResolvePath(args[0]);
+                var hashToCheck = args[1];
+
+                if(File.Exists(fullPath))
+                {
+                    var fileHash = FileHashExtensions.ComputeFileSha256(fullPath);
+                    var hashMatches = fileHash.Equals(hashToCheck, StringComparison.OrdinalIgnoreCase);
+
+                    var result = new CheckActionResponseDto
+                    {
+                        Success = true,
+                        Path = fullPath,
+                        HashMatches = hashMatches
+                    };
+
+                    return WebSocketAPIUtils.CreateActionResponse(result);
+                }
+                else
+                {
+                    var result = new CheckActionResponseDto
+                    {
+                        Success = false,
+                        Path = "",
+                        HashMatches = false
+                    };
+
+                    return WebSocketAPIUtils.CreateActionResponse(result);
+                }
+            }
+            catch(Exception e)
+            {
+                return WebSocketAPIUtils.CreateEmptyActionResponse(e.Message);
+            }
+        }
+
         [WebSocketAPIAction("tweak/socket", "1.5.0")]
         private WebSocketAPIResponse TweakSocketAction(List<string> _)
         {
@@ -406,6 +468,16 @@ namespace Antmicro.Renode.WebSockets.Providers
             public float CTime;
             [JsonProperty("mtime")]
             public float MTime;
+        }
+
+        private class CheckActionResponseDto
+        {
+            [JsonProperty("success")]
+            public bool Success;
+            [JsonProperty("path")]
+            public string Path;
+            [JsonProperty("hashMatches")]
+            public bool HashMatches;
         }
     }
 }
