@@ -126,6 +126,29 @@ namespace Antmicro.Renode.WebSockets.Providers
             return WebSocketAPIUtils.CreateEmptyActionResponse("Symbol not found");
         }
 
+        [WebSocketAPIAction("get-symbol-address", "1.5.0")]
+        private WebSocketAPIResponse GetSymbolAddress(string symbol)
+        {
+            var emulationManager = EmulationManager.Instance;
+            var emulation = emulationManager.CurrentEmulation;
+            var machine = emulation.Machines.FirstOrDefault();
+            if(machine == null)
+            {
+                return WebSocketAPIUtils.CreateEmptyActionResponse("No machine found in the current emulation");
+            }
+            else
+            {
+                if(!machine.SystemBus.TryGetAllSymbolAddresses(symbol, out var addresses))
+                {
+                    return WebSocketAPIUtils.CreateEmptyActionResponse($"Symbol '{symbol}' not found in the current machine");
+                }
+                else
+                {
+                    return WebSocketAPIUtils.CreateActionResponse(addresses.ToArray());
+                }
+            }
+        }
+
         [WebSocketAPIAction("add-pause", "1.5.0")]
         private WebSocketAPIResponse AddPause(List<string> symbols)
         {
