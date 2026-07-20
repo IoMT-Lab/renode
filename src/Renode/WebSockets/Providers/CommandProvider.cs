@@ -63,6 +63,44 @@ namespace Antmicro.Renode.WebSockets.Providers
             }
         }
 
+        [WebSocketAPIAction("get-command-set-vector-table-offset", "1.5.0")]
+        private WebSocketAPIResponse SetVectorTableOffset(uint offset)
+        {
+            var emulationManager = EmulationManager.Instance;
+            var emulation = emulationManager.CurrentEmulation;
+
+            var machine = emulation.Machines.FirstOrDefault();
+            if(machine == null)
+            {
+                return WebSocketAPIUtils.CreateEmptyActionResponse("No machine found in the current emulation");
+            }
+            else
+            {
+                var cpus = machine.SystemBus.GetCPUs().OfType<CortexM>(); ;
+                if(cpus.Count() == 0)
+                {
+                    return WebSocketAPIUtils.CreateEmptyActionResponse("No CortexM CPU found in the current machine");
+                }
+                else if(cpus.Count() > 1)
+                {
+                    return WebSocketAPIUtils.CreateEmptyActionResponse("Multiple CortexMCPUs found in the current machine. This provider supports only single CPU machines.");
+                }
+                else
+                {
+                    var cpu = cpus.First();
+                    if(machine.TryGetAnyName(cpu, out var name))
+                    {
+                        var command = "{0} VectorTableOffset {1}".FormatWith(name, offset);
+                        return WebSocketAPIUtils.CreateActionResponse(new[] { command });
+                    }
+                    else
+                    {
+                        return WebSocketAPIUtils.CreateEmptyActionResponse("Could not find a name for the CPU in the current machine");
+                    }
+                }
+            }
+        }
+
         private WebSocketAPISharedData SharedData;
     }
 }
