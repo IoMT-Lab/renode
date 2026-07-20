@@ -99,33 +99,6 @@ namespace Antmicro.Renode.WebSockets.Providers
             });
         }
 
-        [WebSocketAPIAction("set-program-counter", "1.5.0")]
-        private WebSocketAPIResponse SetProgramCounter(string symbol)
-        {
-            var emulationManager = EmulationManager.Instance;
-            var emulation = emulationManager.CurrentEmulation;
-
-            var machine = emulation.Machines.FirstOrDefault();
-            if(machine == null)
-            {
-                return WebSocketAPIUtils.CreateEmptyActionResponse("No machine found in the current emulation");
-            }
-            else
-            {
-                foreach(var cpu in machine.SystemBus.GetCPUs())
-                {
-                    if(machine.SystemBus.TryGetAllSymbolAddresses(symbol, out var addressesEnumerable, cpu))
-                    {
-                        var pc = addressesEnumerable.First();
-                        cpu.PC = pc;
-                        return WebSocketAPIUtils.CreateEmptyActionResponse();
-                    }
-                }
-            }
-
-            return WebSocketAPIUtils.CreateEmptyActionResponse("Symbol not found");
-        }
-
         [WebSocketAPIAction("get-symbol-address", "1.5.0")]
         private WebSocketAPIResponse GetSymbolAddress(string symbol)
         {
