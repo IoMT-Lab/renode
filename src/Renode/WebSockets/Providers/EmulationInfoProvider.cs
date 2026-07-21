@@ -110,9 +110,21 @@ namespace Antmicro.Renode.WebSockets.Providers
         {
             var interaction = monitor.Interaction as CommandInteractionWrapper;
             interaction.WriteLine("", null);
-            var result = commands.Select(c => ExecuteCommand(c, interaction) ?? "").ToArray();
-            interaction.Write(currentMonitorPrefix, currentMonitorPrefixColor);
-            return WebSocketAPIUtils.CreateActionResponse(result);
+
+            var result = new List<string>();
+            foreach(var c in commands)
+            {
+                if(ExecuteCommand(c, interaction, out var commandResult))
+                {
+                    result.Add(commandResult);
+                }
+                else
+                {
+                    interaction.Write(currentMonitorPrefix, currentMonitorPrefixColor);
+                    return WebSocketAPIUtils.CreateActionResponse(result.ToArray(), commandResult);
+                }
+            }
+            return WebSocketAPIUtils.CreateActionResponse(result.ToArray());
         }
 
         private WebSocketAPIResponse GetMachines()
@@ -242,7 +254,7 @@ namespace Antmicro.Renode.WebSockets.Providers
             }
         }
 
-        private string ExecuteCommand(string command, CommandInteractionWrapper interaction)
+        private bool ExecuteCommand(string command, CommandInteractionWrapper interaction, out string result)
         {
             interaction.Clear();
             interaction.Write(currentMonitorPrefix, currentMonitorPrefixColor);
@@ -250,16 +262,19 @@ namespace Antmicro.Renode.WebSockets.Providers
 
             if(!monitor.Parse(command))
             {
-                return $"Could not execute command '{command}': {interaction?.GetError()}";
+                result = $"Could not execute command '{command}': {interaction?.GetError()}";
+                return false;
             }
 
             var error = interaction.GetError();
             if(!string.IsNullOrEmpty(error))
             {
-                return $"There was an error when executing command '{command}': {error}";
+                result = $"There was an error when executing command '{command}': {error}";
+                return false;
             }
 
-            return interaction.GetContents();
+            result = interaction.GetContents();
+            return true;
         }
 
         private bool ExecRenodeArgParser(ExecRenodeArgParserData data, bool machineRequired, bool peripheralRequired)
