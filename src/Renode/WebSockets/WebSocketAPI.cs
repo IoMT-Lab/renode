@@ -282,7 +282,8 @@ namespace Antmicro.Renode.WebSockets
                 var serializedEvent = JsonConvert.SerializeObject(eventResponse);
 
                 Logger.Log(LogLevel.Debug, $"Event raised: {serializedEvent.ToString()}");
-                foreach(var connection in subscriptions)
+                var subscriptionCopy = subscriptions.ToList();
+                foreach (var connection in subscriptionCopy)
                 {
                     connection.Send(Encoding.UTF8.GetBytes(serializedEvent));
                 }
