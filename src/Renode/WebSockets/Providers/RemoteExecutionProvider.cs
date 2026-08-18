@@ -72,7 +72,10 @@ namespace Antmicro.Renode.WebSockets.Providers
                 if(cpu != null)
                 {
                     cpu.OnFunctionCall += FunctionCallHandler;
-                    cpu.AddHookAtWfiStateChange((wfi) => WfiEvent.RaiseEvent(wfi));
+                    cpu.AddHookAtWfiStateChange((wfi) => WfiEvent.RaiseEvent(new WfiEventData
+                    {
+                        IsWfi = wfi
+                    }));
                 }
             }
         }
@@ -271,7 +274,7 @@ namespace Antmicro.Renode.WebSockets.Providers
         [WebSocketAPIEvent("function-call", "1.5.0")]
         private readonly WebSocketAPIEventHandler FunctionCallEvent;
 
-        [WebSocketAPIEvent("wfi", "1.5.0")]
+        [WebSocketAPIEvent("wfi-changed", "1.5.0")]
         private readonly WebSocketAPIEventHandler WfiEvent;
 #pragma warning restore 649
 
@@ -303,6 +306,12 @@ namespace Antmicro.Renode.WebSockets.Providers
             public string Name;
             [JsonProperty("entry")]
             public bool Entry;
+        }
+
+        private class WfiEventData
+        {
+            [JsonProperty("is_wfi")]
+            public bool IsWfi;
         }
     }
 }
