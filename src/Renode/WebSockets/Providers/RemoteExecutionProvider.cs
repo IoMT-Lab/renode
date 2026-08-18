@@ -72,6 +72,7 @@ namespace Antmicro.Renode.WebSockets.Providers
                 if(cpu != null)
                 {
                     cpu.OnFunctionCall += FunctionCallHandler;
+                    cpu.AddHookAtWfiStateChange((wfi) => WfiEvent.RaiseEvent(wfi));
                 }
             }
         }
@@ -269,6 +270,9 @@ namespace Antmicro.Renode.WebSockets.Providers
 
         [WebSocketAPIEvent("function-call", "1.5.0")]
         private readonly WebSocketAPIEventHandler FunctionCallEvent;
+
+        [WebSocketAPIEvent("wfi", "1.5.0")]
+        private readonly WebSocketAPIEventHandler WfiEvent;
 #pragma warning restore 649
 
         private class EmulatorStateChangedEventData
