@@ -6,6 +6,7 @@ using Antmicro.Renode.Core;
 using Antmicro.Renode.Hooks;
 using Antmicro.Renode.Peripherals.Bus;
 using Antmicro.Renode.Peripherals.CPU;
+using Antmicro.Renode.Utilities.Collections;
 
 using Newtonsoft.Json;
 
@@ -26,6 +27,13 @@ namespace Antmicro.Renode.WebSockets.Providers
             return true;
         }
 
+        private void Reset()
+        {
+            UnhandledAccessCount = 0;
+            SeenSymbols.Clear();
+            RecentFunctionCalls.Clear();
+        }
+
         private void EmulationChangedEventHandler()
         {
             var emulation = EmulationManager.Instance.CurrentEmulation;
@@ -36,6 +44,8 @@ namespace Antmicro.Renode.WebSockets.Providers
             {
                 Value = "emulation-cleared"
             });
+
+            Reset();
         }
 
         private void MachineStateChangedEventHandler(IMachine machine, MachineStateChangedEventArgs args)
@@ -76,25 +86,53 @@ namespace Antmicro.Renode.WebSockets.Providers
                     {
                         IsWfi = wfi
                     }));
+
+                    SyncFunctionTracing();
                 }
             }
         }
 
         private void UnhandledAccessHandler(UnhandledAccess access)
         {
-            UnhandledAccessEvent.RaiseEvent(new UnhandledAccessEventData
+            if(UnhandledAccessLimit < 0 || UnhandledAccessCount < UnhandledAccessLimit)
             {
-                Name = access.Symbol?.Name ?? "<unknown>",
-                PC = access.PC,
-                Write = access.Access == Access.Write,
-                Address = access.Address,
-                Width = (int)access.AccessWidth,
-                Value = access.Value
-            });
+                UnhandledAccessCount++;
+                var recentFunctionCalls = RecentFunctionCalls.ToList();
+                recentFunctionCalls.Reverse();
+                UnhandledAccessEvent.RaiseEvent(new UnhandledAccessEventData
+                {
+                    Name = access.Symbol?.Name ?? "<unknown>",
+                    PC = access.PC,
+                    Write = access.Access == Access.Write,
+                    Address = access.Address,
+                    Width = (int)access.AccessWidth,
+                    Value = access.Value,
+                    CallHistory = recentFunctionCalls
+                });
+            }
         }
 
         private void FunctionCallHandler(ICpuSupportingGdb cpu, ulong address, Symbol symbol)
         {
+            RecentFunctionCalls.Enqueue(symbol.Name);
+
+            switch(Trace)
+            {
+            case TraceState.None:
+                return;
+
+            case TraceState.FirstOnly:
+                if(SeenSymbols.Contains(symbol))
+                {
+                    return;
+                }
+                SeenSymbols.Add(symbol);
+                break;
+
+            case TraceState.All:
+                break;
+            }
+
             var entry = address == symbol.Start;
             FunctionCallEvent.RaiseEvent(new FunctionCallEventData
             {
@@ -197,7 +235,7 @@ namespace Antmicro.Renode.WebSockets.Providers
             {
                 var cpu = machine.SystemBus.GetCPUs().FirstOrDefault();
                 var armCPU = cpu as Antmicro.Renode.Peripherals.CPU.Arm;
-                if(cpu == null)
+                if(armCPU == null)
                 {
                     return WebSocketAPIUtils.CreateEmptyActionResponse("No Arm CPU found in the current machine");
                 }
@@ -226,7 +264,7 @@ namespace Antmicro.Renode.WebSockets.Providers
             {
                 var cpu = machine.SystemBus.GetCPUs().FirstOrDefault();
                 var armCPU = cpu as Antmicro.Renode.Peripherals.CPU.Arm;
-                if(cpu == null)
+                if(armCPU == null)
                 {
                     return WebSocketAPIUtils.CreateEmptyActionResponse("No Arm CPU found in the current machine");
                 }
@@ -261,7 +299,71 @@ namespace Antmicro.Renode.WebSockets.Providers
             }
         }
 
+        [WebSocketAPIAction("configure-unhandled-access", "1.5.0")]
+        private WebSocketAPIResponse ConfigureUnhandledAccess(int limit, int functionTrackingLimit)
+        {
+            UnhandledAccessLimit = limit;
+            RecentFunctionCalls = new CircularBuffer<string>(functionTrackingLimit);
+            return WebSocketAPIUtils.CreateEmptyActionResponse();
+        }
+
+        [WebSocketAPIAction("configure-function-tracing", "1.5.0")]
+        private WebSocketAPIResponse ConfigureFunctionTracing(bool enable, bool firstOnly, List<string> allowedPrefixes, List<string> disallowedPrefixes)
+        {
+            if(enable)
+            {
+                Trace = firstOnly ? TraceState.FirstOnly : TraceState.All;
+            }
+            else
+            {
+                Trace = TraceState.None;
+                SeenSymbols.Clear();
+            }
+
+            AllowedPrefixes = allowedPrefixes;
+            DisallowedPrefixes = disallowedPrefixes;
+
+            SyncFunctionTracing();
+            return WebSocketAPIUtils.CreateEmptyActionResponse();
+        }
+
+        private void SyncFunctionTracing()
+        {
+            var emulationManager = EmulationManager.Instance;
+            var emulation = emulationManager.CurrentEmulation;
+            var machine = emulation.Machines.FirstOrDefault();
+            if(machine != null)
+            {
+                var cpu = machine.SystemBus.GetCPUs().FirstOrDefault();
+                var translationCpu = cpu as Antmicro.Renode.Peripherals.CPU.TranslationCPU;
+                if(translationCpu != null)
+                {
+                    if(Trace == TraceState.None)
+                    {
+                        translationCpu.LogFunctionNames(false, new List<string>(), new List<string>());
+                    }
+                    else
+                    {
+                        translationCpu.LogFunctionNames(true, AllowedPrefixes ?? new List<string>(), DisallowedPrefixes ?? new List<string>(), true, true, true);
+                    }
+                }
+            }
+        }
+
+        private CircularBuffer<string> RecentFunctionCalls = new CircularBuffer<string>(16);
+
         private WebSocketAPISharedData SharedData;
+
+        private TraceState Trace = TraceState.None;
+
+        private List<string> AllowedPrefixes;
+        private List<string> DisallowedPrefixes;
+
+        private int UnhandledAccessCount = 0;
+
+        private int UnhandledAccessLimit = -1;
+
+        private readonly HashSet<Symbol> SeenSymbols = new HashSet<Symbol>();
 
         // 649:  Field '...' is never assigned to, and will always have its default value null
 #pragma warning disable 649
@@ -298,6 +400,9 @@ namespace Antmicro.Renode.WebSockets.Providers
             public int Width;
             [JsonProperty("value")]
             public ulong Value;
+
+            [JsonProperty("call_history")]
+            public List<string> CallHistory;
         }
 
         private class FunctionCallEventData
@@ -312,6 +417,13 @@ namespace Antmicro.Renode.WebSockets.Providers
         {
             [JsonProperty("is_wfi")]
             public bool IsWfi;
+        }
+
+        private enum TraceState
+        {
+            None,
+            FirstOnly,
+            All,
         }
     }
 }
